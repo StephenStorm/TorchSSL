@@ -37,6 +37,8 @@ def test_setattr_cls_from_kwargs():
 
 
 def net_builder(net_name, from_name: bool, net_conf=None, is_remix=False):
+    # imagenet:
+    # _net_builder = net_builder('ResNet50', False, None, is_remix=False)
     """
     return **class** of backbone network (not instance).
     Args

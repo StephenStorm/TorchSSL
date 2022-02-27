@@ -69,6 +69,7 @@ class ImagenetDataset(torchvision.datasets.ImageFolder):
         extensions = ('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tiff', '.webp')
         classes, class_to_idx = self._find_classes(self.root)
         samples = self.make_dataset(self.root, class_to_idx, extensions, is_valid_file)
+        # samples = [(file_path, class_id), ()...]
         if len(samples) == 0:
             msg = "Found 0 files in subfolders of: {}\n".format(self.root)
             if extensions is not None:
@@ -81,7 +82,7 @@ class ImagenetDataset(torchvision.datasets.ImageFolder):
         self.classes = classes
         self.class_to_idx = class_to_idx
         self.samples = samples
-        self.targets = [s[1] for s in samples]
+        self.targets = [s[1] for s in samples] # class_id
 
         if self.ulb:
             self.strong_transform = copy.deepcopy(transform)
@@ -104,6 +105,7 @@ class ImagenetDataset(torchvision.datasets.ImageFolder):
             extensions=None,
             is_valid_file=None,
     ):
+        # samples = self.make_dataset(self.root, class_to_idx, extensions, None)
         instances = []
         directory = os.path.expanduser(directory)
         both_none = extensions is None and is_valid_file is None
@@ -115,6 +117,7 @@ class ImagenetDataset(torchvision.datasets.ImageFolder):
                 return x.lower().endswith(extensions)
 
         lb_idx = {}
+
 
         for target_class in sorted(class_to_idx.keys()):
             class_index = class_to_idx[target_class]
@@ -137,15 +140,18 @@ class ImagenetDataset(torchvision.datasets.ImageFolder):
                 json.dump(lb_idx, f)
         del lb_idx
         gc.collect()
+        # lb_idx[class_name] = [file names]
+        # instance = [tuple, ]  tuple: (path, class_id)
         return instances
 
 
 class ImageNetLoader:
     def __init__(self, root_path, num_labels=-1, num_class=1000):
         self.root_path = os.path.join(root_path, 'imagenet')
-        self.num_labels = num_labels // num_class
+        self.num_labels = num_labels // num_class # ？
 
     def get_transform(self, train, ulb):
+        # param : ulb  , useless
         if train:
             transform = transforms.Compose([
                 transforms.Resize([256, 256]),
@@ -189,6 +195,9 @@ def get_transform(mean, std, crop_size, train=True):
 
 
 class SSL_Dataset:
+    # imagenet call ： 
+    # train_dset = SSL_Dataset(args, alg='flexmatch', name=args.dataset, train=True,
+    #                             num_classes=args.num_classes, data_dir=args.data_dir)
     """
     SSL_Dataset class gets dataset from torchvision.datasets,
     separates labeled and unlabeled data,
@@ -198,7 +207,7 @@ class SSL_Dataset:
     def __init__(self,
                  args,
                  alg='fixmatch',
-                 name='cifar10',
+                 name='cifar10', # imagenet
                  train=True,
                  num_classes=10,
                  data_dir='./data'):
@@ -216,6 +225,7 @@ class SSL_Dataset:
         self.train = train
         self.num_classes = num_classes
         self.data_dir = data_dir
+        # imagenet : 224
         crop_size = 96 if self.name.upper() == 'STL10' else 224 if self.name.upper() == 'IMAGENET' else 32
         self.transform = get_transform(mean[name], std[name], crop_size, train)
 
@@ -225,6 +235,10 @@ class SSL_Dataset:
         shape of data: B, H, W, C
         shape of labels: B,
         """
+        # stephen test:
+        # print('ssl_dataset get_data: self.name : {}'.format(self.name)) # imagenet 
+
+
         dset = getattr(torchvision.datasets, self.name.upper())
         if 'CIFAR' in self.name.upper():
             dset = dset(self.data_dir, train=self.train, download=True)
@@ -280,6 +294,8 @@ class SSL_Dataset:
     def get_ssl_dset(self, num_labels, index=None, include_lb_to_ulb=True,
                      strong_transform=None, onehot=False):
         """
+        call : get_ssl_dset(args.num_labels)
+
         get_ssl_dset split training samples into labeled and unlabeled samples.
         The labeled data is balanced samples over classes.
         
@@ -294,7 +310,8 @@ class SSL_Dataset:
             BasicDataset (for labeled data), BasicDataset (for unlabeld data)
         """
         # Supervised top line using all data as labeled data.
-        if self.alg == 'fullysupervised':
+        # self.alg = 'flexmatch'
+        if self.alg == 'fullysupervised': 
             lb_data, lb_targets = self.get_data()
             lb_dset = BasicDataset(self.alg, lb_data, lb_targets, self.num_classes,
                                    self.transform, False, None, onehot)
@@ -307,10 +324,14 @@ class SSL_Dataset:
             lb_data, lb_targets, _ = sample_labeled_data(self.args, lb_data, lb_targets, num_labels, self.num_classes)
             ulb_targets = None
         else:
+            # imagenet :
+            
             data, targets = self.get_data()
+
             lb_data, lb_targets, ulb_data, ulb_targets = split_ssl_data(self.args, data, targets,
                                                                         num_labels, self.num_classes,
                                                                         index, include_lb_to_ulb)
+            print('get_ssl_dset in ssl_dataset.py, imagenet datasets, lb_data type: {}'.format(type(lb_data)))
         # output the distribution of labeled data for remixmatch
         count = [0 for _ in range(self.num_classes)]
         for c in lb_targets:

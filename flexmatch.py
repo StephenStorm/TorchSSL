@@ -54,9 +54,9 @@ def main(args):
 
     # distributed: true if manually selected or if world_size > 1
     args.distributed = args.world_size > 1 or args.multiprocessing_distributed
-    ngpus_per_node = torch.cuda.device_count()  # number of gpus of each node
+    ngpus_per_node = torch.cuda.device_count()  # number of gpus of each node 
 
-    if args.multiprocessing_distributed:
+    if args.multiprocessing_distributed: # True
         # now, args.world_size means num of total processes in all nodes
         args.world_size = ngpus_per_node * args.world_size
 
@@ -107,6 +107,7 @@ def main_worker(gpu, ngpus_per_node, args):
     args.bn_momentum = 1.0 - 0.999
     if 'imagenet' in args.dataset.lower():
         _net_builder = net_builder('ResNet50', False, None, is_remix=False)
+        # only a builder , not model.
     else:
         _net_builder = net_builder(args.net,
                                    args.net_from_name,
@@ -186,6 +187,7 @@ def main_worker(gpu, ngpus_per_node, args):
  
     # Construct Dataset & DataLoader
     if args.dataset.lower() != "imagenet":
+        # dataset: imagenet
         train_dset = SSL_Dataset(args, alg='flexmatch', name=args.dataset, train=True,
                                 num_classes=args.num_classes, data_dir=args.data_dir)
         lb_dset, ulb_dset = train_dset.get_ssl_dset(args.num_labels)
@@ -193,8 +195,11 @@ def main_worker(gpu, ngpus_per_node, args):
                                 num_classes=args.num_classes, data_dir=args.data_dir)
         eval_dset = _eval_dset.get_dset()
     else:
+        # imagenet this way !
+        # num_labels = 100 000
         image_loader = ImageNetLoader(root_path=args.data_dir, num_labels=args.num_labels,
                                       num_class=args.num_classes)
+        # 
         lb_dset = image_loader.get_lb_train_data()
         ulb_dset = image_loader.get_ulb_train_data()
         eval_dset = image_loader.get_lb_test_data()
